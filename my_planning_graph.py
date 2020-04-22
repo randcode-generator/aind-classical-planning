@@ -19,8 +19,8 @@ class ActionLayer(BaseActionLayer):
         --------
         layers.ActionNode
         """
-        # TODO: implement this function
-        raise NotImplementedError
+        for action in zip(self.children[actionA], self.children[actionB]):
+            return action[0] == ~action[1]
 
 
     def _interference(self, actionA, actionB):
@@ -34,8 +34,16 @@ class ActionLayer(BaseActionLayer):
         --------
         layers.ActionNode
         """
-        # TODO: implement this function
-        raise NotImplementedError
+        for actB in self.children[actionB]:
+            for actAprecondition in actionA.preconditions:
+                if actB == ~actAprecondition:
+                    return True
+        for actA in self.children[actionA]:
+            for actBprecondition in actionB.preconditions:
+                if actBprecondition == ~actA:
+                    return True
+        
+        return False
 
     def _competing_needs(self, actionA, actionB):
         """ Return True if any preconditions of the two actions are pairwise mutex in the parent layer
@@ -49,9 +57,11 @@ class ActionLayer(BaseActionLayer):
         layers.ActionNode
         layers.BaseLayer.parent_layer
         """
-        # TODO: implement this function
-        raise NotImplementedError
-
+        for actA in actionA.preconditions:
+            for actB in actionB.preconditions:
+                if self.parent_layer.is_mutex(actA, actB) == True:
+                    return True
+        return False
 
 class LiteralLayer(BaseLiteralLayer):
 
@@ -66,13 +76,23 @@ class LiteralLayer(BaseLiteralLayer):
         --------
         layers.BaseLayer.parent_layer
         """
-        # TODO: implement this function
-        raise NotImplementedError
+        actAarr = []
+        actBarr = []
+        for act in self.parent_layer.children:
+            if(literalA in self.parent_layer.children[act]):
+                actAarr.append(act)
+            if(literalB in self.parent_layer.children[act]):
+                actBarr.append(act)
+
+        for actA in actAarr:
+            for actB in actBarr:
+                if (self.parent_layer.is_mutex(actA, actB) == False or self.parent_layer.is_mutex(actB, actA) == False):
+                    return False
+        return True
 
     def _negation(self, literalA, literalB):
         """ Return True if two literals are negations of each other """
-        # TODO: implement this function
-        raise NotImplementedError
+        return ~literalA == literalB
 
 
 class PlanningGraph:
@@ -110,6 +130,14 @@ class PlanningGraph:
         self.literal_layers = [layer]
         self.action_layers = []
 
+    def h_level_cost(self, goal):
+        i = 0
+        for j in self.literal_layers:
+            dict2 = j.children
+            if(goal in dict2):
+                return i
+            i += 1
+
     def h_levelsum(self):
         """ Calculate the level sum heuristic for the planning graph
 
@@ -135,8 +163,12 @@ class PlanningGraph:
         --------
         Russell-Norvig 10.3.1 (3rd Edition)
         """
-        # TODO: implement this function
-        raise NotImplementedError
+        self.fill()
+        cost = []
+        for n in self.goal:
+            c = self.h_level_cost(n)
+            cost.append(c)
+        return sum(cost)
 
     def h_maxlevel(self):
         """ Calculate the max level heuristic for the planning graph
@@ -165,8 +197,12 @@ class PlanningGraph:
         -----
         WARNING: you should expect long runtimes using this heuristic with A*
         """
-        # TODO: implement maxlevel heuristic
-        raise NotImplementedError
+        self.fill()
+        cost = []
+        for n in self.goal:
+            c = self.h_level_cost(n)
+            cost.append(c)
+        return max(cost)
 
     def h_setlevel(self):
         """ Calculate the set level heuristic for the planning graph
@@ -190,8 +226,22 @@ class PlanningGraph:
         -----
         WARNING: you should expect long runtimes using this heuristic on complex problems
         """
-        # TODO: implement setlevel heuristic
-        raise NotImplementedError
+        self.fill()
+        for (count, j) in enumerate(self.literal_layers):
+            allGoalsMet = True
+            for goal in self.goal:
+                if goal not in j:
+                    allGoalsMet = False
+            if not allGoalsMet:
+                continue
+            
+            goalsAreMutex = False
+            for goalA in self.goal:
+                for goalB in self.goal:
+                    if j.is_mutex(goalA, goalB):
+                        goalsAreMutex = True
+            if not goalsAreMutex:
+                return count
 
     ##############################################################################
     #                     DO NOT MODIFY CODE BELOW THIS LINE                     #
