@@ -130,14 +130,6 @@ class PlanningGraph:
         self.literal_layers = [layer]
         self.action_layers = []
 
-    def h_level_cost(self, goal):
-        i = 0
-        for j in self.literal_layers:
-            dict2 = j.children
-            if(goal in dict2):
-                return i
-            i += 1
-
     def h_levelsum(self):
         """ Calculate the level sum heuristic for the planning graph
 
@@ -163,12 +155,21 @@ class PlanningGraph:
         --------
         Russell-Norvig 10.3.1 (3rd Edition)
         """
-        self.fill()
-        cost = []
-        for n in self.goal:
-            c = self.h_level_cost(n)
-            cost.append(c)
-        return sum(cost)
+        i = 0
+        cost = 0
+        goalFound = set()
+        while not self._is_leveled:
+            for goal in self.goal:
+                if(goal in goalFound):
+                    continue
+                if goal in self.literal_layers[-1]:
+                    cost += i
+                    goalFound.add(goal)
+                    if(len(goalFound) == len(self.goal)):
+                        return cost
+            self._extend()
+            i += 1
+        return cost
 
     def h_maxlevel(self):
         """ Calculate the max level heuristic for the planning graph
@@ -197,12 +198,17 @@ class PlanningGraph:
         -----
         WARNING: you should expect long runtimes using this heuristic with A*
         """
-        self.fill()
-        cost = []
-        for n in self.goal:
-            c = self.h_level_cost(n)
-            cost.append(c)
-        return max(cost)
+        i = 0
+        while not self._is_leveled:
+            allGoalsMet = True
+            for goal in self.goal:
+                if goal not in self.literal_layers[-1]:
+                    allGoalsMet = False
+            if allGoalsMet == True:
+                return i
+            else:
+                self._extend()
+            i += 1
 
     def h_setlevel(self):
         """ Calculate the set level heuristic for the planning graph
@@ -226,22 +232,26 @@ class PlanningGraph:
         -----
         WARNING: you should expect long runtimes using this heuristic on complex problems
         """
-        self.fill()
-        for (count, j) in enumerate(self.literal_layers):
+        i = -1
+        while not self._is_leveled:
+            i += 1
             allGoalsMet = True
+            currLayer = self.literal_layers[-1]
             for goal in self.goal:
-                if goal not in j:
+                if goal not in currLayer:
                     allGoalsMet = False
             if not allGoalsMet:
+                self._extend()
                 continue
             
             goalsAreMutex = False
             for goalA in self.goal:
                 for goalB in self.goal:
-                    if j.is_mutex(goalA, goalB):
+                    if currLayer.is_mutex(goalA, goalB):
                         goalsAreMutex = True
             if not goalsAreMutex:
-                return count
+                return i
+            self._extend()
 
     ##############################################################################
     #                     DO NOT MODIFY CODE BELOW THIS LINE                     #
